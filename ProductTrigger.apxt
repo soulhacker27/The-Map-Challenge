@@ -1,0 +1,39 @@
+trigger ProductTrigger on Product2 (after insert, after update, after delete, after undelete) {
+    List<Product2> productList = new List<Product2>();
+    Map<String, String> productFamilyByProduct = new Map<String, String>();
+    Map<String, String> productFamilyByOpportunity = new Map<String, String>();
+    List<Opportunity> opportunityListToUpdate = new List<Opportunity>();
+    if(Trigger.isAfter){
+        if(Trigger.isDelete){
+            productList = Trigger.old;
+        }else{
+            productList = Trigger.new;
+        }
+    }
+
+    for(Product2 pro : productList){
+        if(pro.Family != null){
+            productFamilyByProduct.put(pro.Id, pro.Family);
+        }
+        if(Trigger.isUpdate){
+            Product2 productObj = Trigger.oldMap.get(pro.Id);
+            if(productObj.Family != pro.Family){
+                 productFamilyByProduct.put(productObj.Id,pro.Family);
+            }
+        }
+    }
+    
+    for(OpportunityLineItem ole : [Select Id, Product2Id, Product2.Family, OpportunityId From OpportunityLineItem
+                                   Where Product2Id IN : productFamilyByProduct.keySet()]){
+                                   productFamilyByOpportunity.put(ole.OpportunityId, ole.Product2.Family);
+                                   }
+    
+    for(Opportunity oppObj : [Select Id, Type From Opportunity Where Id IN : productFamilyByOpportunity.keySet()]){
+        oppObj.type = productFamilyByOpportunity.get(oppObj.Id);
+        opportunityListToUpdate.add(oppObj);                           
+    }
+    
+    if(opportunityListToUpdate.size() > 0){
+        UPDATE opportunityListToUpdate;
+    }
+}
